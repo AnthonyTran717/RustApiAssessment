@@ -1,9 +1,14 @@
-use axum::{extract::Form, response::Html, routing::get, Router};
+use axum::{extract::Form, response::{Html, Redirect, IntoResponse}, routing::get, Router, Extension};
+use credential_storage::CredentialStorage;
 use serde::Deserialize;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::{Arc, Mutex}};
+
+mod credential_storage;
 
 #[tokio::main]
 async fn main() {
+    let credential_storage = Arc::new(Mutex::new(CredentialStorage::new()));
+
     // Route all requests on "/" endpoint to anonymous handler.
     //
     // A handler is an async function which returns something that implements
@@ -12,7 +17,7 @@ async fn main() {
     // A closure or a function can be used as handler.
 
     // build our application with some routes
-    let app = Router::new().route("/", get(show_form).post(accept_form));
+    let app = Router::new().route("/", get(show_form).post(accept_form)).layer(Extension(credential_storage)).route("/hello", get(show_hello_word));
 
     // Address that server will bind to.
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -35,7 +40,7 @@ async fn show_form() -> Html<&'static str> {
                 <form action="/" method="post">
                     <label for="name">
                         Enter your name:
-                        <input type="text" name="name">
+                        <input type="text" name="username">
                     </label>
                     <label>
                         Enter your email:
@@ -53,14 +58,32 @@ async fn show_form() -> Html<&'static str> {
     )
 }
 
+async fn show_hello_word() -> Html<&'static str> {
+    Html(
+        r#"
+        <!doctype html>
+        <html>
+            <head></head>
+            <body>
+                Hello World!
+            </body>
+        </html>
+        "#,
+    )
+}
+
 #[derive(Deserialize, Debug)]
 #[allow(dead_code)]
 struct Input {
-    name: String,
+    username: String,
     email: String,
     password: String,
 }
 
-async fn accept_form(Form(input): Form<Input>) {
+async fn accept_form(Extension(credential_storage): Extension<Arc<Mutex<CredentialStorage>>>, Form(input): Form<Input>) -> impl IntoResponse {
     dbg!(&input);
+    let mut credential_storage = credential_storage.lock().unwrap();
+    credential_storage.add_user(input.email, input.username, input.password);
+    dbg!(credential_storage.get_size());
+    Redirect::to("/hello")
 }
