@@ -17,7 +17,9 @@ async fn main() {
     // A closure or a function can be used as handler.
 
     // build our application with some routes
-    let app = Router::new().route("/", get(show_form).post(accept_form)).layer(Extension(credential_storage)).route("/hello", get(show_hello_word));
+    let app = Router::new().route("/", get(show_form).post(accept_form)).layer(Extension(credential_storage))
+        .route("/login", get(show_login).post(accept_login))
+        .route("/hello", get(show_hello_word));
 
     // Address that server will bind to.
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -58,6 +60,30 @@ async fn show_form() -> Html<&'static str> {
     )
 }
 
+async fn show_login() -> Html<&'static str> {
+    Html(
+        r#"
+        <!doctype html>
+        <html>
+            <head></head>
+            <body>
+                <form action="/" method="post">
+                    <label>
+                        Enter your email:
+                        <input type="text" name="email">
+                    </label>
+                    <label>
+                        Enter your password:
+                        <input type="text" name="password">
+                    </label>
+                    <input type="submit" value="Subscribe!">
+                </form>
+            </body>
+        </html>
+        "#,
+    )
+}
+
 async fn show_hello_word() -> Html<&'static str> {
     Html(
         r#"
@@ -80,10 +106,26 @@ struct Input {
     password: String,
 }
 
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct Login {
+    email: String,
+    password: String,
+}
+
 async fn accept_form(Extension(credential_storage): Extension<Arc<Mutex<CredentialStorage>>>, Form(input): Form<Input>) -> impl IntoResponse {
     dbg!(&input);
     let mut credential_storage = credential_storage.lock().unwrap();
     credential_storage.add_user(input.email, input.username, input.password);
-    dbg!(credential_storage.get_size());
     Redirect::to("/hello")
+}
+
+async fn accept_login(Extension(credential_storage): Extension<Arc<Mutex<CredentialStorage>>>, Form(login): Form<Login>) -> impl IntoResponse {
+    dbg!(&login);
+    let credential_storage = credential_storage.lock().unwrap();
+    let user = credential_storage.get_user(login.email);
+    match user {
+        Some(user) => format!("Welcome {}!", user.user),
+        None => String::from("No user found"),
+    }
 }

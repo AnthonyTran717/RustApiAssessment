@@ -4,9 +4,9 @@ pub struct CredentialStorage {
     credentials: HashMap<String, Credential>, //<email, Credential>
 }
 
-struct Credential {
-    user: String,
-    password: String
+pub struct Credential {
+    pub user: String,
+    pub password: String
 }
 
 impl CredentialStorage {
@@ -16,13 +16,13 @@ impl CredentialStorage {
         }
     }
 
-    pub fn get_size(&self) -> usize {
-        self.credentials.keys().len()
-    }
-
     pub fn add_user(&mut self, email: String, user: String, password: String) {
         self.credentials.insert(email, Credential {
             user, password
         });
+    }
+
+    pub fn get_user(&self, email: String) -> Option<&Credential> {
+        self.credentials.get(&email)
     }
 }
